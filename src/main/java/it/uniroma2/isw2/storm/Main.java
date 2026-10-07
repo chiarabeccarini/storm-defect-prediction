@@ -1,8 +1,13 @@
 package it.uniroma2.isw2.storm;
 
+import it.uniroma2.isw2.storm.classes.ProductionClassFilter;
+import it.uniroma2.isw2.storm.classes.ReleaseClass;
+import it.uniroma2.isw2.storm.classes.ReleaseClassCsvWriter;
 import it.uniroma2.isw2.storm.git.GitRepository;
 import it.uniroma2.isw2.storm.jira.JiraClient;
 import it.uniroma2.isw2.storm.jira.ReleaseExtractor;
+import it.uniroma2.isw2.storm.release.IncludedRelease;
+import it.uniroma2.isw2.storm.release.IncludedReleaseCsvReader;
 import it.uniroma2.isw2.storm.release.MainlineSelector;
 import it.uniroma2.isw2.storm.release.Release;
 import it.uniroma2.isw2.storm.release.ReleaseCsvReader;
@@ -30,8 +35,9 @@ public final class Main {
 
     private static final Path VERSION_INFO_CSV = Path.of("data", PROJECT_KEY + "VersionInfo.csv");
     private static final Path RELEASES_CSV = Path.of("data", PROJECT_KEY + "Releases.csv");
+    private static final Path CLASSES_CSV = Path.of("data", PROJECT_KEY + "Classes.csv");
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes>\"";
 
     private Main() {
     }
@@ -43,6 +49,7 @@ public final class Main {
         switch (args[0]) {
             case "releases" -> extractReleases();
             case "selection" -> selectReleases();
+            case "classes" -> extractClasses();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -67,5 +74,24 @@ public final class Main {
         SelectedReleaseCsvWriter.write(selectedReleases, RELEASES_CSV);
         LOGGER.info(() -> mainline.size() + " release nella linea principale, " + includedCount
                 + " incluse nel dataset, salvate in " + RELEASES_CSV);
+    }
+
+    private static void extractClasses() throws IOException {
+        GitRepository storm = new GitRepository(STORM_REPO);
+        String originalBranch = storm.currentBranch();
+        List<ReleaseClass> releaseClasses = new ArrayList<>();
+        try {
+            for (IncludedRelease release : IncludedReleaseCsvReader.read(RELEASES_CSV)) {
+                storm.checkout(release.commit());
+                storm.trackedFiles().stream()
+                        .filter(ProductionClassFilter::isProductionClass)
+                        .map(path -> new ReleaseClass(release.releaseId(), path))
+                        .forEach(releaseClasses::add);
+            }
+        } finally {
+            storm.checkout(originalBranch);
+        }
+        ReleaseClassCsvWriter.write(releaseClasses, CLASSES_CSV);
+        LOGGER.info(() -> releaseClasses.size() + " coppie classe-release salvate in " + CLASSES_CSV);
     }
 }
