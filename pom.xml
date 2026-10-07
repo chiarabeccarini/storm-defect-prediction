@@ -21,4 +21,12 @@
     <sonar.projectKey>chiarabeccarini_storm-defect-prediction</sonar.projectKey>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
   </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20260814</version>
+    </dependency>
+  </dependencies>
 </project>
