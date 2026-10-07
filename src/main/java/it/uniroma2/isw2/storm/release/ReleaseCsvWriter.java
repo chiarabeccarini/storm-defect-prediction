@@ -9,7 +9,7 @@ import java.util.List;
 
 public final class ReleaseCsvWriter {
 
-    private static final String HEADER = "Index,Version ID,Version Name,Date";
+    static final String HEADER = "Index,Version ID,Version Name,Date";
 
     private ReleaseCsvWriter() {
     }
