@@ -6,6 +6,7 @@ import it.uniroma2.isw2.storm.classes.ReleaseClassCsvWriter;
 import it.uniroma2.isw2.storm.git.GitRepository;
 import it.uniroma2.isw2.storm.jira.JiraClient;
 import it.uniroma2.isw2.storm.jira.ReleaseExtractor;
+import it.uniroma2.isw2.storm.jira.TicketExtractor;
 import it.uniroma2.isw2.storm.release.IncludedRelease;
 import it.uniroma2.isw2.storm.release.IncludedReleaseCsvReader;
 import it.uniroma2.isw2.storm.release.MainlineSelector;
@@ -15,6 +16,9 @@ import it.uniroma2.isw2.storm.release.ReleaseCsvWriter;
 import it.uniroma2.isw2.storm.release.SelectedRelease;
 import it.uniroma2.isw2.storm.release.SelectedReleaseCsvWriter;
 import it.uniroma2.isw2.storm.release.TagResolver;
+import it.uniroma2.isw2.storm.ticket.Ticket;
+import it.uniroma2.isw2.storm.ticket.TicketCsvWriter;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.URI;
@@ -36,8 +40,13 @@ public final class Main {
     private static final Path VERSION_INFO_CSV = Path.of("data", PROJECT_KEY + "VersionInfo.csv");
     private static final Path RELEASES_CSV = Path.of("data", PROJECT_KEY + "Releases.csv");
     private static final Path CLASSES_CSV = Path.of("data", PROJECT_KEY + "Classes.csv");
+    private static final Path TICKETS_CSV = Path.of("data", PROJECT_KEY + "Tickets.csv");
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes>\"";
+    // Stessa query del programma fornito a lezione.
+    private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
+            + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
+
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets>\"";
 
     private Main() {
     }
@@ -50,6 +59,7 @@ public final class Main {
             case "releases" -> extractReleases();
             case "selection" -> selectReleases();
             case "classes" -> extractClasses();
+            case "tickets" -> extractTickets();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -93,5 +103,12 @@ public final class Main {
         }
         ReleaseClassCsvWriter.write(releaseClasses, CLASSES_CSV);
         LOGGER.info(() -> releaseClasses.size() + " coppie classe-release salvate in " + CLASSES_CSV);
+    }
+
+    private static void extractTickets() throws IOException {
+        List<JSONObject> issues = new JiraClient(JIRA_URL).searchIssues(BUG_TICKETS_JQL, TicketExtractor.FIELDS);
+        List<Ticket> tickets = TicketExtractor.tickets(issues);
+        TicketCsvWriter.write(tickets, TICKETS_CSV);
+        LOGGER.info(() -> tickets.size() + " ticket di bug salvati in " + TICKETS_CSV);
     }
 }
