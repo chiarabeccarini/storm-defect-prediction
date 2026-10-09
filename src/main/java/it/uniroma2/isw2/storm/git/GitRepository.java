@@ -7,11 +7,15 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class GitRepository {
 
     private static final int GIT_NOT_FOUND = 1;
     private static final String REV_PARSE = "rev-parse";
+    private static final String CONFIG_OPTION = "-c";
+    private static final String QUOTE_PATH_OFF = "core.quotepath=off";
 
     private final Path workTree;
 
@@ -52,7 +56,62 @@ public final class GitRepository {
     }
 
     public List<String> trackedFiles() throws IOException {
-        return run("-c", "core.quotepath=off", "ls-files").lines().toList();
+        return run(CONFIG_OPTION, QUOTE_PATH_OFF, "ls-files").lines().toList();
+    }
+
+    public Path fileInWorkTree(String relativePath) {
+        requireNotBlank(relativePath, "Percorso del file mancante");
+        return workTree.resolve(relativePath);
+    }
+
+    /**
+     * Commit non di merge raggiungibili dalle revisioni indicate, dal più vecchio al più recente,
+     * con la rilevazione delle rinomine attiva: il limite di file per la rilevazione è alzato perché
+     * alcuni commit di Storm spostano migliaia di file e git altrimenti la disattiverebbe.
+     */
+    public List<Commit> history(List<String> revisions) throws IOException {
+        if (revisions.isEmpty()) {
+            throw new IllegalArgumentException("Nessuna revisione di cui leggere la storia");
+        }
+        List<String> arguments = new ArrayList<>(List.of(CONFIG_OPTION, QUOTE_PATH_OFF, CONFIG_OPTION, "diff.renameLimit=100000",
+                "log", "--no-merges", "--topo-order", "--reverse", "-M", "--numstat", "--format=" + CommitLogParser.FORMAT));
+        arguments.addAll(revisions);
+        return CommitLogParser.parse(run(arguments.toArray(String[]::new)));
+    }
+
+    /** Hash dei commit indicati da un intervallo di revisioni (es. {@code a..b} oppure {@code b}). */
+    public Set<String> commitsIn(String revisionRange) throws IOException {
+        requireNotBlank(revisionRange, "Intervallo di revisioni mancante");
+        return run("rev-list", revisionRange).lines().collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * Merge che uniscono storie senza alcun commit in comune: è così che moduli sviluppati in
+     * repository separati (es. storm-hdfs, storm-hbase, flux) sono stati importati in Storm.
+     * Per ognuno restituisce i soli file aggiunti rispetto al primo genitore.
+     */
+    public List<Commit> importMerges(List<String> revisions) throws IOException {
+        List<String> arguments = new ArrayList<>(List.of("rev-list", "--merges", "--parents"));
+        arguments.addAll(revisions);
+        List<Commit> imports = new ArrayList<>();
+        for (String mergeLine : run(arguments.toArray(String[]::new)).lines().toList()) {
+            String[] hashes = mergeLine.split(" ");
+            if (!haveCommonAncestor(hashes[1], hashes[2])) {
+                imports.addAll(CommitLogParser.parse(run(CONFIG_OPTION, QUOTE_PATH_OFF, "show", "--diff-merges=first-parent",
+                        "--no-renames", "--numstat", "--diff-filter=A", "--format=" + CommitLogParser.FORMAT, hashes[0])));
+            }
+        }
+        return imports;
+    }
+
+    private boolean haveCommonAncestor(String firstParent, String secondParent) throws IOException {
+        List<String> command = gitCommand("merge-base", firstParent, secondParent);
+        GitResult mergeBase = execute(command);
+        if (mergeBase.exitCode() == GIT_NOT_FOUND) {
+            return false;
+        }
+        checked(command, mergeBase);
+        return true;
     }
 
     private String run(String... arguments) throws IOException {
