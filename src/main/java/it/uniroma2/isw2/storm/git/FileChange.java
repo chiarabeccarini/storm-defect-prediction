@@ -1,6 +1,8 @@
 package it.uniroma2.isw2.storm.git;
 
-public record FileChange(String oldPath, String newPath, int addedLines, int deletedLines) {
+public record FileChange(String oldPath, String newPath, int addedLines, int deletedLines, boolean created) {
+
+    private static final String JAVA_EXTENSION = ".java";
 
     public FileChange {
         if (newPath == null || newPath.isBlank()) {
@@ -13,5 +15,9 @@ public record FileChange(String oldPath, String newPath, int addedLines, int del
 
     public boolean isRename() {
         return !oldPath.equals(newPath);
+    }
+
+    public boolean isJavaFile() {
+        return newPath.endsWith(JAVA_EXTENSION);
     }
 }

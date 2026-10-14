@@ -4,9 +4,11 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Interpreta l'output di {@code git log --numstat} prodotto con {@link #FORMAT}: i separatori
+ * Interpreta l'output di {@code git log --numstat --summary} prodotto con {@link #FORMAT}: i separatori
  * ASCII 0x1E e 0x1F non compaiono nei messaggi, quindi delimitano in modo sicuro commit e campi.
  */
 public final class CommitLogParser {
@@ -17,6 +19,9 @@ public final class CommitLogParser {
     private static final String FIELD_SEPARATOR = "\u001f";
     private static final int FIELDS = 5;
     private static final String RENAME_ARROW = " => ";
+    private static final String SUMMARY_PREFIX = " ";
+    private static final String CREATE_MODE = " create mode ";
+
     private CommitLogParser() {
     }
 
@@ -32,9 +37,14 @@ public final class CommitLogParser {
         if (fields.length != FIELDS) {
             throw new IllegalArgumentException("Record di git log non valido: " + commitRecord.lines().findFirst().orElse(""));
         }
-        List<FileChange> changes = fields[4].lines()
-                .filter(line -> !line.isBlank())
-                .map(CommitLogParser::toFileChange)
+        List<String> lines = fields[4].lines().filter(line -> !line.isBlank()).toList();
+        Set<String> createdPaths = lines.stream()
+                .filter(line -> line.startsWith(CREATE_MODE))
+                .map(CommitLogParser::createdPath)
+                .collect(Collectors.toUnmodifiableSet());
+        List<FileChange> changes = lines.stream()
+                .filter(line -> !line.startsWith(SUMMARY_PREFIX))
+                .map(line -> toFileChange(line, createdPaths))
                 .toList();
         return new Commit(fields[0].trim(), fields[1], authorDate(fields[2], fields[0]), fields[3].strip(), changes);
     }
@@ -47,13 +57,20 @@ public final class CommitLogParser {
         }
     }
 
-    private static FileChange toFileChange(String numstatLine) {
+    // Le righe del riepilogo iniziano con uno spazio, quelle numstat con il numero di righe aggiunte:
+    // dal riepilogo servono solo i file creati, scritti come " create mode <permessi> <percorso>".
+    private static String createdPath(String summaryLine) {
+        String modeAndPath = summaryLine.substring(CREATE_MODE.length());
+        return modeAndPath.substring(modeAndPath.indexOf(' ') + 1);
+    }
+
+    private static FileChange toFileChange(String numstatLine, Set<String> createdPaths) {
         String[] columns = numstatLine.split("\t", 3);
         if (columns.length != 3) {
             throw new IllegalArgumentException("Riga numstat non valida: " + numstatLine);
         }
         String[] paths = renamePaths(columns[2]);
-        return new FileChange(paths[0], paths[1], lineCount(columns[0]), lineCount(columns[1]));
+        return new FileChange(paths[0], paths[1], lineCount(columns[0]), lineCount(columns[1]), createdPaths.contains(paths[1]));
     }
 
     // Per i file binari git riporta "-" al posto del numero di righe.
