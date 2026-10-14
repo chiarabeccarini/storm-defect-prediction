@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 public final class ClassMetricsExtractor {
 
     private static final Logger LOGGER = Logger.getLogger(ClassMetricsExtractor.class.getName());
+    private static final int SHORT_HASH_LENGTH = 9;
 
     private final GitRepository repository;
     private final FixCommitDetector fixDetector;
@@ -42,6 +43,7 @@ public final class ClassMetricsExtractor {
         List<String> releaseCommits = releases.stream().map(IncludedRelease::commit).toList();
         List<Commit> history = repository.history(releaseCommits);
         logCommitSizes(history);
+        logMechanicalCommits(history);
         ClassIdentityTracker identities = new ClassIdentityTracker(history);
         LOGGER.info(() -> identities.renamedPaths() + " percorsi ricondotti a una classe precedente tramite le rinomine");
         Map<String, List<ClassRevision>> revisionsByIdentity = revisionsByIdentity(history, identities);
@@ -90,7 +92,7 @@ public final class ClassMetricsExtractor {
     private Map<String, List<ClassRevision>> revisionsByIdentity(List<Commit> history, ClassIdentityTracker identities) {
         Map<String, List<ClassRevision>> revisions = new HashMap<>();
         for (Commit commit : history) {
-            for (FileChange change : commit.changes()) {
+            for (FileChange change : commit.changes().stream().filter(FileChange::isJavaFile).toList()) {
                 revisions.computeIfAbsent(identities.identityOf(change.newPath()), identity -> new ArrayList<>())
                         .add(toRevision(commit, change));
             }
@@ -104,7 +106,7 @@ public final class ClassMetricsExtractor {
         int importedFiles = 0;
         for (Commit importMerge : importMerges) {
             LocalDate importDate = importMerge.authorDate().toLocalDate();
-            for (FileChange addedFile : importMerge.changes()) {
+            for (FileChange addedFile : importMerge.changes().stream().filter(FileChange::isJavaFile).toList()) {
                 List<ClassRevision> revisions = revisionsByIdentity.computeIfAbsent(identities.identityOf(addedFile.newPath()),
                         identity -> new ArrayList<>());
                 if (revisions.stream().allMatch(revision -> revision.date().isAfter(importDate))) {
@@ -119,7 +121,8 @@ public final class ClassMetricsExtractor {
 
     private ClassRevision toRevision(Commit commit, FileChange change) {
         return new ClassRevision(commit.hash(), commit.authorDate().toLocalDate(), commit.authorName(),
-                change.addedLines(), change.deletedLines(), commit.changes().size(), fixDetector.isFix(commit.message()));
+                change.addedLines(), change.deletedLines(), commit.javaFileCount(), BulkCommits.isBulk(commit),
+                BulkCommits.isMechanical(commit), fixDetector.isFix(commit.message()));
     }
 
     // ISO-8859-1 non fallisce mai la decodifica: il numero di righe non dipende dalla codifica del file.
@@ -134,10 +137,20 @@ public final class ClassMetricsExtractor {
         if (sizes.isEmpty()) {
             return;
         }
-        long bulkCommits = sizes.stream().filter(size -> size > WindowMetrics.BULK_COMMIT_FILES).count();
+        long bulkCommits = sizes.stream().filter(size -> size > BulkCommits.FILE_THRESHOLD).count();
         LOGGER.info(() -> String.format("File per commit su %d commit: mediana %d, 95o percentile %d, 99o percentile %d, "
                         + "commit con piu' di %d file: %d", sizes.size(), percentile(sizes, 50), percentile(sizes, 95),
-                percentile(sizes, 99), WindowMetrics.BULK_COMMIT_FILES, bulkCommits));
+                percentile(sizes, 99), BulkCommits.FILE_THRESHOLD, bulkCommits));
+    }
+
+    private static void logMechanicalCommits(List<Commit> history) {
+        List<String> mechanicalCommits = history.stream()
+                .filter(commit -> BulkCommits.isMechanical(commit) && commit.javaFileCount() > 0)
+                .map(commit -> commit.hash().substring(0, SHORT_HASH_LENGTH) + " (" + commit.changes().size() + " file, "
+                        + commit.javaFileCount() + " .java)")
+                .toList();
+        LOGGER.info(() -> "Commit meccanici che toccano classi Java, esclusi dalle metriche: " + mechanicalCommits.size()
+                + " " + mechanicalCommits);
     }
 
     private static int percentile(List<Integer> sortedValues, int percent) {

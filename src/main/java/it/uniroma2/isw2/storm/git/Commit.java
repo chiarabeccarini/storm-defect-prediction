@@ -15,4 +15,12 @@ public record Commit(String hash, String authorName, OffsetDateTime authorDate, 
         Objects.requireNonNull(message, "message");
         changes = List.copyOf(changes);
     }
+
+    public int javaFileCount() {
+        return (int) changes.stream().filter(FileChange::isJavaFile).count();
+    }
+
+    public boolean createsJavaFile() {
+        return changes.stream().anyMatch(change -> change.created() && change.isJavaFile());
+    }
 }

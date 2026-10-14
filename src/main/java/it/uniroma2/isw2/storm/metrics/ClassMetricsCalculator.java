@@ -14,19 +14,24 @@ public final class ClassMetricsCalculator {
     /**
      * Metriche di una classe in una release, a partire da tutte le revisioni della classe (con
      * i percorsi precedenti alle rinomine) e dai commit della finestra e dell'intera storia della release.
+     * Le revisioni dei commit meccanici non entrano nelle metriche, ma contano per l'età: provano che
+     * la classe esisteva già, anche quando git non riesce a collegarla alla sua revisione di creazione.
      */
     public static ClassMetrics compute(int releaseId, String classPath, int loc, LocalDate releaseDate,
                                        List<ClassRevision> classRevisions, Set<String> releaseWindow, Set<String> releaseHistory) {
-        List<ClassRevision> windowRevisions = within(classRevisions, releaseWindow);
         List<ClassRevision> historyRevisions = within(classRevisions, releaseHistory);
-        WindowMetrics total = WindowMetrics.of(historyRevisions);
+        WindowMetrics total = WindowMetrics.of(measured(historyRevisions));
         long ageWeeks = ageInWeeks(historyRevisions, releaseDate);
-        return new ClassMetrics(releaseId, classPath, loc, WindowMetrics.of(windowRevisions), total,
-                ageWeeks, ageWeeks * total.churn().sum());
+        return new ClassMetrics(releaseId, classPath, loc, WindowMetrics.of(measured(within(classRevisions, releaseWindow))),
+                total, ageWeeks, ageWeeks * total.churn().sum());
     }
 
     private static List<ClassRevision> within(List<ClassRevision> classRevisions, Set<String> commits) {
         return classRevisions.stream().filter(revision -> commits.contains(revision.commitHash())).toList();
+    }
+
+    private static List<ClassRevision> measured(List<ClassRevision> revisions) {
+        return revisions.stream().filter(revision -> !revision.mechanicalCommit()).toList();
     }
 
     // Settimane dal primo commit della classe alla data della release; una data d'autore successiva alla release vale 0.

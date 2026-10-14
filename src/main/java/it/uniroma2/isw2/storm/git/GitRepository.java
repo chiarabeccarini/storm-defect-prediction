@@ -68,13 +68,15 @@ public final class GitRepository {
      * Commit non di merge raggiungibili dalle revisioni indicate, dal più vecchio al più recente,
      * con la rilevazione delle rinomine attiva: il limite di file per la rilevazione è alzato perché
      * alcuni commit di Storm spostano migliaia di file e git altrimenti la disattiverebbe.
+     * Il riepilogo ({@code --summary}) indica quali file ogni commit crea.
      */
     public List<Commit> history(List<String> revisions) throws IOException {
         if (revisions.isEmpty()) {
             throw new IllegalArgumentException("Nessuna revisione di cui leggere la storia");
         }
         List<String> arguments = new ArrayList<>(List.of(CONFIG_OPTION, QUOTE_PATH_OFF, CONFIG_OPTION, "diff.renameLimit=100000",
-                "log", "--no-merges", "--topo-order", "--reverse", "-M", "--numstat", "--format=" + CommitLogParser.FORMAT));
+                "log", "--no-merges", "--topo-order", "--reverse", "-M", "--numstat", "--summary",
+                "--format=" + CommitLogParser.FORMAT));
         arguments.addAll(revisions);
         return CommitLogParser.parse(run(arguments.toArray(String[]::new)));
     }
@@ -98,7 +100,7 @@ public final class GitRepository {
             String[] hashes = mergeLine.split(" ");
             if (!haveCommonAncestor(hashes[1], hashes[2])) {
                 imports.addAll(CommitLogParser.parse(run(CONFIG_OPTION, QUOTE_PATH_OFF, "show", "--diff-merges=first-parent",
-                        "--no-renames", "--numstat", "--diff-filter=A", "--format=" + CommitLogParser.FORMAT, hashes[0])));
+                        "--no-renames", "--numstat", "--summary", "--diff-filter=A", "--format=" + CommitLogParser.FORMAT, hashes[0])));
             }
         }
         return imports;
