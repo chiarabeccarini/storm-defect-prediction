@@ -7,9 +7,6 @@ import java.util.stream.Collectors;
 public record WindowMetrics(int revisions, int fixes, int authors, Distribution addedLines, Distribution churn,
                             Distribution changeSet) {
 
-    // I commit che toccano più file di questa soglia sono riorganizzazioni di massa: esclusi dal solo change set.
-    static final int BULK_COMMIT_FILES = 50;
-
     public record Distribution(int sum, int max, double average) {
 
         static Distribution of(List<Integer> values) {
@@ -19,10 +16,11 @@ public record WindowMetrics(int revisions, int fixes, int authors, Distribution 
         }
     }
 
+    // I commit di massa rimasti nel calcolo (quelli che creano classi) restano esclusi dal solo change set.
     public static WindowMetrics of(List<ClassRevision> revisions) {
         List<Integer> changeSets = revisions.stream()
-                .map(ClassRevision::commitFileCount)
-                .filter(fileCount -> fileCount <= BULK_COMMIT_FILES)
+                .filter(revision -> !revision.bulkCommit())
+                .map(ClassRevision::changeSetSize)
                 .toList();
         int fixes = (int) revisions.stream().filter(ClassRevision::fix).count();
         int authors = revisions.stream().map(ClassRevision::authorName).collect(Collectors.toSet()).size();
