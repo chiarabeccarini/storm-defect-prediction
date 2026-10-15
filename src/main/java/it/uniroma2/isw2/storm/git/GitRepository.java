@@ -81,6 +81,13 @@ public final class GitRepository {
         return CommitLogParser.parse(run(arguments.toArray(String[]::new)));
     }
 
+    /** Righe del file com'era subito prima del commit, cioè nel suo genitore: equivale a {@code git show <commit>^:<percorso>}. */
+    public int linesBefore(String commit, String path) throws IOException {
+        requireNotBlank(commit, "Commit mancante");
+        requireNotBlank(path, "Percorso del file mancante");
+        return (int) run(CONFIG_OPTION, QUOTE_PATH_OFF, "show", commit + "^:" + path).lines().count();
+    }
+
     /** Hash dei commit indicati da un intervallo di revisioni (es. {@code a..b} oppure {@code b}). */
     public Set<String> commitsIn(String revisionRange) throws IOException {
         requireNotBlank(revisionRange, "Intervallo di revisioni mancante");

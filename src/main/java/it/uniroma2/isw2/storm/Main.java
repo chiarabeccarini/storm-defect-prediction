@@ -8,9 +8,12 @@ import it.uniroma2.isw2.storm.git.GitRepository;
 import it.uniroma2.isw2.storm.jira.JiraClient;
 import it.uniroma2.isw2.storm.jira.ReleaseExtractor;
 import it.uniroma2.isw2.storm.jira.TicketExtractor;
+import it.uniroma2.isw2.storm.metrics.ClassCommitMetrics;
+import it.uniroma2.isw2.storm.metrics.ClassCommitMetricsCsvWriter;
 import it.uniroma2.isw2.storm.metrics.ClassMetrics;
 import it.uniroma2.isw2.storm.metrics.ClassMetricsCsvWriter;
 import it.uniroma2.isw2.storm.metrics.ClassMetricsExtractor;
+import it.uniroma2.isw2.storm.metrics.CommitMetricsExtractor;
 import it.uniroma2.isw2.storm.metrics.FixCommitDetector;
 import it.uniroma2.isw2.storm.release.IncludedRelease;
 import it.uniroma2.isw2.storm.release.IncludedReleaseCsvReader;
@@ -48,12 +51,13 @@ public final class Main {
     private static final Path CLASSES_CSV = Path.of("data", PROJECT_KEY + "Classes.csv");
     private static final Path TICKETS_CSV = Path.of("data", PROJECT_KEY + "Tickets.csv");
     private static final Path CLASS_METRICS_CSV = Path.of("data", PROJECT_KEY + "ClassMetrics.csv");
+    private static final Path COMMIT_METRICS_CSV = Path.of("data", PROJECT_KEY + "CommitMetrics.csv");
 
     // Stessa query del programma fornito a lezione.
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits>\"";
 
     private Main() {
     }
@@ -68,6 +72,7 @@ public final class Main {
             case "classes" -> extractClasses();
             case "tickets" -> extractTickets();
             case "metrics" -> computeClassMetrics();
+            case "commits" -> computeCommitMetrics();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -127,5 +132,14 @@ public final class Main {
                 ReleaseClassCsvReader.read(CLASSES_CSV));
         ClassMetricsCsvWriter.write(classMetrics, CLASS_METRICS_CSV);
         LOGGER.info(() -> classMetrics.size() + " righe di metriche di classe salvate in " + CLASS_METRICS_CSV);
+    }
+
+    private static void computeCommitMetrics() throws IOException {
+        FixCommitDetector fixDetector = new FixCommitDetector(PROJECT_KEY, TicketCsvReader.readKeys(TICKETS_CSV));
+        CommitMetricsExtractor extractor = new CommitMetricsExtractor(new GitRepository(STORM_REPO), fixDetector);
+        List<ClassCommitMetrics> commitMetrics = extractor.extract(IncludedReleaseCsvReader.read(RELEASES_CSV),
+                ReleaseClassCsvReader.read(CLASSES_CSV));
+        ClassCommitMetricsCsvWriter.write(commitMetrics, COMMIT_METRICS_CSV);
+        LOGGER.info(() -> commitMetrics.size() + " righe di metriche dei commit salvate in " + COMMIT_METRICS_CSV);
     }
 }
