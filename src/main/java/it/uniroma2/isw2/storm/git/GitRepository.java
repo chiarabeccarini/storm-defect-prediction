@@ -10,20 +10,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public final class GitRepository {
+public record GitRepository(Path workTree) {
 
     private static final int GIT_NOT_FOUND = 1;
     private static final String REV_PARSE = "rev-parse";
     private static final String CONFIG_OPTION = "-c";
     private static final String QUOTE_PATH_OFF = "core.quotepath=off";
 
-    private final Path workTree;
-
-    public GitRepository(Path workTree) {
-        if (!Files.isDirectory(workTree.resolve(".git"))) {
+    public GitRepository {
+        if (workTree == null || !Files.isDirectory(workTree.resolve(".git"))) {
             throw new IllegalArgumentException("Non è un repository Git: " + workTree);
         }
-        this.workTree = workTree;
     }
 
     /** Commit puntato dal tag, indicato sempre come {@code refs/tags/...} perché alcuni nomi sono anche branch. */

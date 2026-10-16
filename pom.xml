@@ -30,5 +30,10 @@
       <artifactId>json</artifactId>
       <version>20260814</version>
     </dependency>
+    <dependency>
+      <groupId>net.sourceforge.pmd</groupId>
+      <artifactId>pmd-java</artifactId>
+      <version>7.26.0</version>
+    </dependency>
   </dependencies>
 </project>
