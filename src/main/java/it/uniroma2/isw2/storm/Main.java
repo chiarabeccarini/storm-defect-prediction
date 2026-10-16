@@ -24,6 +24,9 @@ import it.uniroma2.isw2.storm.release.ReleaseCsvWriter;
 import it.uniroma2.isw2.storm.release.SelectedRelease;
 import it.uniroma2.isw2.storm.release.SelectedReleaseCsvWriter;
 import it.uniroma2.isw2.storm.release.TagResolver;
+import it.uniroma2.isw2.storm.smells.ClassSmells;
+import it.uniroma2.isw2.storm.smells.ClassSmellsCsvWriter;
+import it.uniroma2.isw2.storm.smells.SmellExtractor;
 import it.uniroma2.isw2.storm.ticket.Ticket;
 import it.uniroma2.isw2.storm.ticket.TicketCsvReader;
 import it.uniroma2.isw2.storm.ticket.TicketCsvWriter;
@@ -52,12 +55,13 @@ public final class Main {
     private static final Path TICKETS_CSV = Path.of("data", PROJECT_KEY + "Tickets.csv");
     private static final Path CLASS_METRICS_CSV = Path.of("data", PROJECT_KEY + "ClassMetrics.csv");
     private static final Path COMMIT_METRICS_CSV = Path.of("data", PROJECT_KEY + "CommitMetrics.csv");
+    private static final Path SMELLS_CSV = Path.of("data", PROJECT_KEY + "Smells.csv");
 
     // Stessa query del programma fornito a lezione.
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells>\"";
 
     private Main() {
     }
@@ -73,6 +77,7 @@ public final class Main {
             case "tickets" -> extractTickets();
             case "metrics" -> computeClassMetrics();
             case "commits" -> computeCommitMetrics();
+            case "smells" -> countSmells();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -141,5 +146,13 @@ public final class Main {
                 ReleaseClassCsvReader.read(CLASSES_CSV));
         ClassCommitMetricsCsvWriter.write(commitMetrics, COMMIT_METRICS_CSV);
         LOGGER.info(() -> commitMetrics.size() + " righe di metriche dei commit salvate in " + COMMIT_METRICS_CSV);
+    }
+
+    private static void countSmells() throws IOException {
+        SmellExtractor extractor = new SmellExtractor(new GitRepository(STORM_REPO));
+        List<ClassSmells> smells = extractor.extract(IncludedReleaseCsvReader.read(RELEASES_CSV),
+                ReleaseClassCsvReader.read(CLASSES_CSV));
+        ClassSmellsCsvWriter.write(smells, SMELLS_CSV);
+        LOGGER.info(() -> smells.size() + " conteggi di smell salvati in " + SMELLS_CSV);
     }
 }
