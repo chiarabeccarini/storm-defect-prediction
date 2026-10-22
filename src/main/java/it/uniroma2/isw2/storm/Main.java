@@ -8,6 +8,8 @@ import it.uniroma2.isw2.storm.git.GitRepository;
 import it.uniroma2.isw2.storm.jira.JiraClient;
 import it.uniroma2.isw2.storm.jira.ReleaseExtractor;
 import it.uniroma2.isw2.storm.jira.TicketExtractor;
+import it.uniroma2.isw2.storm.labeling.BugginessExtractor;
+import it.uniroma2.isw2.storm.labeling.ClassBugginessCsvWriter;
 import it.uniroma2.isw2.storm.metrics.ClassCommitMetrics;
 import it.uniroma2.isw2.storm.metrics.ClassCommitMetricsCsvWriter;
 import it.uniroma2.isw2.storm.metrics.ClassMetrics;
@@ -37,7 +39,9 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public final class Main {
 
@@ -56,12 +60,13 @@ public final class Main {
     private static final Path CLASS_METRICS_CSV = Path.of("data", PROJECT_KEY + "ClassMetrics.csv");
     private static final Path COMMIT_METRICS_CSV = Path.of("data", PROJECT_KEY + "CommitMetrics.csv");
     private static final Path SMELLS_CSV = Path.of("data", PROJECT_KEY + "Smells.csv");
+    private static final Path BUGGINESS_CSV = Path.of("data", PROJECT_KEY + "Bugginess.csv");
 
     // Stessa query del programma fornito a lezione.
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling>\"";
 
     private Main() {
     }
@@ -78,6 +83,7 @@ public final class Main {
             case "metrics" -> computeClassMetrics();
             case "commits" -> computeCommitMetrics();
             case "smells" -> countSmells();
+            case "labeling" -> labelClasses();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -154,5 +160,17 @@ public final class Main {
                 ReleaseClassCsvReader.read(CLASSES_CSV));
         ClassSmellsCsvWriter.write(smells, SMELLS_CSV);
         LOGGER.info(() -> smells.size() + " conteggi di smell salvati in " + SMELLS_CSV);
+    }
+
+    private static void labelClasses() throws IOException {
+        List<Ticket> tickets = TicketCsvReader.read(TICKETS_CSV);
+        Set<String> ticketKeys = tickets.stream().map(Ticket::key).collect(Collectors.toUnmodifiableSet());
+        BugginessExtractor extractor = new BugginessExtractor(new GitRepository(STORM_REPO),
+                new FixCommitDetector(PROJECT_KEY, ticketKeys));
+        List<ReleaseClass> releaseClasses = ReleaseClassCsvReader.read(CLASSES_CSV);
+        Set<ReleaseClass> buggyClasses = extractor.buggyClasses(IncludedReleaseCsvReader.readMainline(RELEASES_CSV),
+                ReleaseCsvReader.read(VERSION_INFO_CSV), tickets, releaseClasses);
+        ClassBugginessCsvWriter.write(releaseClasses, buggyClasses, BUGGINESS_CSV);
+        LOGGER.info(() -> releaseClasses.size() + " etichette salvate in " + BUGGINESS_CSV);
     }
 }
