@@ -16,6 +16,7 @@ public record GitRepository(Path workTree) {
     private static final String REV_PARSE = "rev-parse";
     private static final String CONFIG_OPTION = "-c";
     private static final String QUOTE_PATH_OFF = "core.quotepath=off";
+    private static final String COMMIT_FORMAT = "--format=" + CommitLogParser.FORMAT;
 
     public GitRepository {
         if (workTree == null || !Files.isDirectory(workTree.resolve(".git"))) {
@@ -73,7 +74,17 @@ public record GitRepository(Path workTree) {
         }
         List<String> arguments = new ArrayList<>(List.of(CONFIG_OPTION, QUOTE_PATH_OFF, CONFIG_OPTION, "diff.renameLimit=100000",
                 "log", "--no-merges", "--topo-order", "--reverse", "-M", "--numstat", "--summary",
-                "--format=" + CommitLogParser.FORMAT));
+                COMMIT_FORMAT));
+        arguments.addAll(revisions);
+        return CommitLogParser.parse(run(arguments.toArray(String[]::new)));
+    }
+
+    /** Commit di merge raggiungibili dalle revisioni indicate, con il solo messaggio e senza file modificati. */
+    public List<Commit> merges(List<String> revisions) throws IOException {
+        if (revisions.isEmpty()) {
+            throw new IllegalArgumentException("Nessuna revisione di cui leggere i merge");
+        }
+        List<String> arguments = new ArrayList<>(List.of("log", "--merges", COMMIT_FORMAT));
         arguments.addAll(revisions);
         return CommitLogParser.parse(run(arguments.toArray(String[]::new)));
     }
@@ -104,7 +115,7 @@ public record GitRepository(Path workTree) {
             String[] hashes = mergeLine.split(" ");
             if (!haveCommonAncestor(hashes[1], hashes[2])) {
                 imports.addAll(CommitLogParser.parse(run(CONFIG_OPTION, QUOTE_PATH_OFF, "show", "--diff-merges=first-parent",
-                        "--no-renames", "--numstat", "--summary", "--diff-filter=A", "--format=" + CommitLogParser.FORMAT, hashes[0])));
+                        "--no-renames", "--numstat", "--summary", "--diff-filter=A", COMMIT_FORMAT, hashes[0])));
             }
         }
         return imports;
