@@ -4,6 +4,7 @@ import it.uniroma2.isw2.storm.classes.ProductionClassFilter;
 import it.uniroma2.isw2.storm.classes.ReleaseClass;
 import it.uniroma2.isw2.storm.classes.ReleaseClassCsvReader;
 import it.uniroma2.isw2.storm.classes.ReleaseClassCsvWriter;
+import it.uniroma2.isw2.storm.dataset.DatasetAssembler;
 import it.uniroma2.isw2.storm.git.GitRepository;
 import it.uniroma2.isw2.storm.jira.JiraClient;
 import it.uniroma2.isw2.storm.jira.ReleaseExtractor;
@@ -61,12 +62,13 @@ public final class Main {
     private static final Path COMMIT_METRICS_CSV = Path.of("data", PROJECT_KEY + "CommitMetrics.csv");
     private static final Path SMELLS_CSV = Path.of("data", PROJECT_KEY + "Smells.csv");
     private static final Path BUGGINESS_CSV = Path.of("data", PROJECT_KEY + "Bugginess.csv");
+    private static final Path DATASET_CSV = Path.of("data", PROJECT_KEY + "Dataset.csv");
 
     // Stessa query del programma fornito a lezione.
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset>\"";
 
     private Main() {
     }
@@ -84,6 +86,7 @@ public final class Main {
             case "commits" -> computeCommitMetrics();
             case "smells" -> countSmells();
             case "labeling" -> labelClasses();
+            case "dataset" -> assembleDataset();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -172,5 +175,12 @@ public final class Main {
                 ReleaseCsvReader.read(VERSION_INFO_CSV), tickets, releaseClasses);
         ClassBugginessCsvWriter.write(releaseClasses, buggyClasses, BUGGINESS_CSV);
         LOGGER.info(() -> releaseClasses.size() + " etichette salvate in " + BUGGINESS_CSV);
+    }
+
+    // Ordine delle colonne del dataset: metriche di classe, metriche dei commit, NSmells, Bugginess.
+    private static void assembleDataset() throws IOException {
+        DatasetAssembler.assemble(PROJECT_KEY, List.of(CLASS_METRICS_CSV, COMMIT_METRICS_CSV, SMELLS_CSV, BUGGINESS_CSV),
+                DATASET_CSV);
+        LOGGER.info(() -> "Dataset salvato in " + DATASET_CSV);
     }
 }
