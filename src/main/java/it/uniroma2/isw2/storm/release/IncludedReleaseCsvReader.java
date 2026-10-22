@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
-import java.util.Optional;
 
 public final class IncludedReleaseCsvReader {
 
@@ -22,13 +21,9 @@ public final class IncludedReleaseCsvReader {
     }
 
     public static List<IncludedRelease> read(Path csvFile) throws IOException {
-        List<String> lines = Files.readAllLines(csvFile, StandardCharsets.UTF_8);
-        if (lines.isEmpty() || !lines.get(0).equals(SelectedReleaseCsvWriter.HEADER)) {
-            throw new IllegalArgumentException("Intestazione inattesa in " + csvFile);
-        }
-        List<IncludedRelease> includedReleases = lines.stream().skip(1)
-                .map(line -> toIncludedRelease(line, csvFile))
-                .flatMap(Optional::stream)
+        List<IncludedRelease> includedReleases = readMainline(csvFile).stream()
+                .filter(MainlineRelease::included)
+                .map(MainlineRelease::toIncludedRelease)
                 .toList();
         if (includedReleases.isEmpty()) {
             throw new IllegalArgumentException("Nessuna release inclusa in " + csvFile);
@@ -36,17 +31,26 @@ public final class IncludedReleaseCsvReader {
         return includedReleases;
     }
 
-    private static Optional<IncludedRelease> toIncludedRelease(String line, Path csvFile) {
+    public static List<MainlineRelease> readMainline(Path csvFile) throws IOException {
+        List<String> lines = Files.readAllLines(csvFile, StandardCharsets.UTF_8);
+        if (lines.isEmpty() || !lines.get(0).equals(SelectedReleaseCsvWriter.HEADER)) {
+            throw new IllegalArgumentException("Intestazione inattesa in " + csvFile);
+        }
+        List<MainlineRelease> releases = lines.stream().skip(1).map(line -> toMainlineRelease(line, csvFile)).toList();
+        if (releases.isEmpty()) {
+            throw new IllegalArgumentException("Nessuna release in " + csvFile);
+        }
+        return releases;
+    }
+
+    private static MainlineRelease toMainlineRelease(String line, Path csvFile) {
         String[] fields = line.split(",", -1);
         if (fields.length != COLUMNS) {
             throw new IllegalArgumentException("Riga non valida in " + csvFile + ": " + line);
         }
-        if (!fields[INCLUDED].equals("yes")) {
-            return Optional.empty();
-        }
         try {
-            return Optional.of(new IncludedRelease(Integer.parseInt(fields[RELEASE_ID]), fields[VERSION_NAME],
-                    LocalDate.parse(fields[DATE]), fields[COMMIT]));
+            return new MainlineRelease(Integer.parseInt(fields[RELEASE_ID]), fields[VERSION_NAME],
+                    LocalDate.parse(fields[DATE]), fields[COMMIT], fields[INCLUDED].equals("yes"));
         } catch (NumberFormatException | DateTimeParseException e) {
             throw new IllegalArgumentException("Release ID o data non validi in " + csvFile + ": " + line, e);
         }

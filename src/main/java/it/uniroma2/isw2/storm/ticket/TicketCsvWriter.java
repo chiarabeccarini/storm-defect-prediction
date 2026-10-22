@@ -10,7 +10,7 @@ import java.util.List;
 public final class TicketCsvWriter {
 
     static final String HEADER = "Key,Created,Resolved,Affected Versions";
-    private static final String VERSION_SEPARATOR = ";";
+    static final String VERSION_SEPARATOR = ";";
 
     private TicketCsvWriter() {
     }

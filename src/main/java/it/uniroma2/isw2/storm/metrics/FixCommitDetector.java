@@ -1,7 +1,9 @@
 package it.uniroma2.isw2.storm.metrics;
 
 import java.util.Set;
+import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Un commit è un fix se il suo messaggio riporta, in qualunque punto, l'identificativo esatto
@@ -21,7 +23,13 @@ public final class FixCommitDetector {
     }
 
     public boolean isFix(String commitMessage) {
+        return !fixedTickets(commitMessage).isEmpty();
+    }
+
+    public Set<String> fixedTickets(String commitMessage) {
         return ticketKey.matcher(commitMessage).results()
-                .anyMatch(match -> bugTicketKeys.contains(match.group()));
+                .map(MatchResult::group)
+                .filter(bugTicketKeys::contains)
+                .collect(Collectors.toUnmodifiableSet());
     }
 }
