@@ -4,19 +4,31 @@ import it.uniroma2.isw2.storm.git.GitRepository;
 import it.uniroma2.isw2.storm.release.IncludedRelease;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * Commit di una release individuati per ascendenza: la finestra contiene quelli raggiungibili dalla release
- * ma non dalla precedente, la storia tutti quelli raggiungibili. Per la prima release le due coincidono.
+ * Commit delle release individuati per ascendenza. La finestra contiene quelli raggiungibili dalla release ma non
+ * dalla precedente; la storia è l'unione delle finestre dalla prima release, cioè i commit raggiungibili da almeno
+ * una release fino a quella corrente, così il totale non perde i commit di una release precedente sviluppata su un
+ * altro ramo. Per la prima release finestra e storia coincidono.
  */
 record ReleaseCommits(Set<String> window, Set<String> history) {
 
-    static ReleaseCommits of(GitRepository repository, IncludedRelease release, String previousReleaseCommit) throws IOException {
-        Set<String> history = repository.commitsIn(release.commit());
-        if (previousReleaseCommit == null) {
-            return new ReleaseCommits(history, history);
+    static Map<Integer, ReleaseCommits> byRelease(GitRepository repository, List<IncludedRelease> releases) throws IOException {
+        Map<Integer, ReleaseCommits> commitsByRelease = new HashMap<>();
+        Set<String> history = new HashSet<>();
+        String previousCommit = null;
+        for (IncludedRelease release : releases) {
+            Set<String> reachable = repository.commitsIn(release.commit());
+            Set<String> window = previousCommit == null ? reachable : repository.commitsIn(previousCommit + ".." + release.commit());
+            history.addAll(reachable);
+            commitsByRelease.put(release.releaseId(), new ReleaseCommits(window, Set.copyOf(history)));
+            previousCommit = release.commit();
         }
-        return new ReleaseCommits(repository.commitsIn(previousReleaseCommit + ".." + release.commit()), history);
+        return commitsByRelease;
     }
 }
