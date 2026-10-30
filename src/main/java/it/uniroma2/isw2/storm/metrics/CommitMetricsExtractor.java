@@ -41,16 +41,15 @@ public final class CommitMetricsExtractor {
         Map<Integer, List<String>> classesByRelease = releaseClasses.stream().collect(Collectors.groupingBy(
                 ReleaseClass::releaseId, Collectors.mapping(ReleaseClass::path, Collectors.toList())));
 
+        Map<Integer, ReleaseCommits> commitsByRelease = ReleaseCommits.byRelease(repository, releases);
         List<ClassCommitMetrics> rows = new ArrayList<>();
-        String previousCommit = null;
         for (IncludedRelease release : releases) {
-            Set<String> window = ReleaseCommits.of(repository, release, previousCommit).window();
+            Set<String> window = commitsByRelease.get(release.releaseId()).window();
             for (String classPath : classesByRelease.getOrDefault(release.releaseId(), List.of())) {
                 rows.add(sumOverWindow(release.releaseId(), classPath, measuredRevisions(history.revisionsOf(classPath), window,
                         metricsByCommit), metricsByCommit));
             }
             LOGGER.info(() -> "Release " + release.name() + ": metriche dei commit calcolate");
-            previousCommit = release.commit();
         }
         return rows;
     }

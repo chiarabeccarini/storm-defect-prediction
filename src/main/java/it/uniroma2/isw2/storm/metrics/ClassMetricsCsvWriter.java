@@ -16,7 +16,7 @@ public final class ClassMetricsCsvWriter {
     private static final String RELEASE_SUFFIX = "_Release";
     private static final String TOTAL_SUFFIX = "_Total";
 
-    // Metriche con asterisco: ognuna produce la colonna della release e quella dell'intera storia.
+    // Metriche con asterisco: ognuna produce la colonna della release e quella della storia fino alla release.
     private static final List<Map.Entry<String, Function<WindowMetrics, String>>> WINDOWED_METRICS = List.of(
             Map.entry("LOC_Touched", window -> String.valueOf(window.churn().sum())),
             Map.entry("NR", window -> String.valueOf(window.revisions())),

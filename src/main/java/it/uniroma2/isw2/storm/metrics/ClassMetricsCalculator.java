@@ -13,7 +13,7 @@ public final class ClassMetricsCalculator {
 
     /**
      * Metriche di una classe in una release, a partire da tutte le revisioni della classe (con
-     * i percorsi precedenti alle rinomine) e dai commit della finestra e dell'intera storia della release.
+     * i percorsi precedenti alle rinomine) e dai commit della finestra e della storia fino alla release.
      * Le revisioni dei commit meccanici non entrano nelle metriche, ma contano per l'età: provano che
      * la classe esisteva già, anche quando git non riesce a collegarla alla sua revisione di creazione.
      */
