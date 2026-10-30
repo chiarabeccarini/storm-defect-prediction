@@ -3,7 +3,7 @@ package it.uniroma2.isw2.storm.metrics;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/** Metriche di una classe calcolate su un insieme di revisioni (la sola release oppure l'intera storia). */
+/** Metriche di una classe calcolate su un insieme di revisioni (la sola release oppure la storia fino alla release). */
 public record WindowMetrics(int revisions, int fixes, int authors, Distribution addedLines, Distribution churn,
                             Distribution changeSet) {
 

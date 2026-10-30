@@ -39,14 +39,13 @@ public final class ClassMetricsExtractor {
 
     private List<ClassMetrics> metricsPerRelease(List<IncludedRelease> releases, Map<Integer, List<String>> classesByRelease,
                                                  ClassHistory history) throws IOException {
+        Map<Integer, ReleaseCommits> commitsByRelease = ReleaseCommits.byRelease(repository, releases);
         String originalBranch = repository.currentBranch();
         List<ClassMetrics> classMetrics = new ArrayList<>();
         try {
-            String previousCommit = null;
             for (IncludedRelease release : releases) {
-                classMetrics.addAll(releaseMetrics(release, previousCommit,
+                classMetrics.addAll(releaseMetrics(release, commitsByRelease.get(release.releaseId()),
                         classesByRelease.getOrDefault(release.releaseId(), List.of()), history));
-                previousCommit = release.commit();
             }
         } finally {
             repository.checkout(originalBranch);
@@ -54,10 +53,9 @@ public final class ClassMetricsExtractor {
         return classMetrics;
     }
 
-    private List<ClassMetrics> releaseMetrics(IncludedRelease release, String previousCommit, List<String> classPaths,
+    private List<ClassMetrics> releaseMetrics(IncludedRelease release, ReleaseCommits releaseCommits, List<String> classPaths,
                                               ClassHistory history) throws IOException {
         repository.checkout(release.commit());
-        ReleaseCommits releaseCommits = ReleaseCommits.of(repository, release, previousCommit);
         return classPaths.stream()
                 .map(classPath -> ClassMetricsCalculator.compute(release.releaseId(), classPath,
                         linesOf(repository.fileInWorkTree(classPath)), release.releaseDate(), history.revisionsOf(classPath),
