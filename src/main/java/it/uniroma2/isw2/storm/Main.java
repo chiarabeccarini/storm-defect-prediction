@@ -18,6 +18,8 @@ import it.uniroma2.isw2.storm.metrics.ClassMetricsCsvWriter;
 import it.uniroma2.isw2.storm.metrics.ClassMetricsExtractor;
 import it.uniroma2.isw2.storm.metrics.CommitMetricsExtractor;
 import it.uniroma2.isw2.storm.metrics.FixCommitDetector;
+import it.uniroma2.isw2.storm.prediction.ArffFiles;
+import it.uniroma2.isw2.storm.prediction.PredictionDataset;
 import it.uniroma2.isw2.storm.release.IncludedRelease;
 import it.uniroma2.isw2.storm.release.IncludedReleaseCsvReader;
 import it.uniroma2.isw2.storm.release.MainlineSelector;
@@ -34,6 +36,7 @@ import it.uniroma2.isw2.storm.ticket.Ticket;
 import it.uniroma2.isw2.storm.ticket.TicketCsvReader;
 import it.uniroma2.isw2.storm.ticket.TicketCsvWriter;
 import org.json.JSONObject;
+import weka.core.Instances;
 
 import java.io.IOException;
 import java.net.URI;
@@ -63,12 +66,17 @@ public final class Main {
     private static final Path SMELLS_CSV = Path.of("data", PROJECT_KEY + "Smells.csv");
     private static final Path BUGGINESS_CSV = Path.of("data", PROJECT_KEY + "Bugginess.csv");
     private static final Path DATASET_CSV = Path.of("data", PROJECT_KEY + "Dataset.csv");
+    private static final Path DATASET_ARFF = Path.of("weka", PROJECT_KEY + "Dataset.arff");
+    private static final Path TRAIN_ARFF = Path.of("weka", PROJECT_KEY + "Train.arff");
+    private static final Path TEST_ARFF = Path.of("weka", PROJECT_KEY + "Test.arff");
+    // Metrica usata nei log per controllare il logaritmo: LOC grezze da 5 a 2.430.
+    private static final String SIZE_METRIC = "LOC_Release";
 
     // Stessa query del programma fornito a lezione.
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff>\"";
 
     private Main() {
     }
@@ -87,6 +95,7 @@ public final class Main {
             case "smells" -> countSmells();
             case "labeling" -> labelClasses();
             case "dataset" -> assembleDataset();
+            case "arff" -> exportArff();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -182,5 +191,24 @@ public final class Main {
         DatasetAssembler.assemble(PROJECT_KEY, List.of(CLASS_METRICS_CSV, COMMIT_METRICS_CSV, SMELLS_CSV, BUGGINESS_CSV),
                 DATASET_CSV);
         LOGGER.info(() -> "Dataset salvato in " + DATASET_CSV);
+    }
+
+    // Split cronologico: training sulle release precedenti all'ultima, test sull'ultima.
+    private static void exportArff() throws IOException {
+        PredictionDataset dataset = PredictionDataset.read(DATASET_CSV);
+        int testRelease = dataset.lastRelease();
+        LOGGER.info(() -> dataset.metricCount() + " metriche trasformate con log10(x + 1); training sulle release 1-"
+                + (testRelease - 1) + ", test sulla release " + testRelease);
+        saveArff(dataset.instances(PROJECT_KEY + "Dataset", release -> true), DATASET_ARFF);
+        saveArff(dataset.instances(PROJECT_KEY + "Train", release -> release < testRelease), TRAIN_ARFF);
+        saveArff(dataset.instances(PROJECT_KEY + "Test", release -> release == testRelease), TEST_ARFF);
+    }
+
+    // Il riepilogo viene dal file riletto con Weka, cioè da ciò che leggeranno i passi successivi.
+    private static void saveArff(Instances instances, Path arffFile) throws IOException {
+        ArffFiles.write(instances, arffFile);
+        Instances saved = ArffFiles.read(arffFile);
+        String summary = ArffFiles.describe(saved) + "; " + ArffFiles.numericRange(saved, SIZE_METRIC);
+        LOGGER.info(() -> arffFile + ": " + summary);
     }
 }
