@@ -1,0 +1,76 @@
+Metric,Scheme,Reference,SchemeMean,ReferenceMean,PValue,Outcome
+Accuracy,RandomForest base,ZeroR base,0.943315,0.910397,1.6405868161214737E-23,migliore
+Precision,RandomForest base,ZeroR base,NaN,NaN,NaN,non definito
+Recall,RandomForest base,ZeroR base,0.490835,0.000000,1.5409424282750432E-40,migliore
+AUC,RandomForest base,ZeroR base,0.950994,0.500000,6.28005540131608E-95,migliore
+Kappa,RandomForest base,ZeroR base,0.577946,0.000000,3.348713941809038E-47,migliore
+Accuracy,NaiveBayes base,ZeroR base,0.770486,0.910397,1.4319334356971355E-42,peggiore
+Precision,NaiveBayes base,ZeroR base,NaN,NaN,NaN,non definito
+Recall,NaiveBayes base,ZeroR base,0.514242,0.000000,1.429934872173065E-38,migliore
+AUC,NaiveBayes base,ZeroR base,0.754283,0.500000,1.2458353867586876E-40,migliore
+Kappa,NaiveBayes base,ZeroR base,0.180628,0.000000,5.1722942807906903E-23,migliore
+Accuracy,IBk base,ZeroR base,0.917715,0.910397,0.040210850060573206,migliore
+Precision,IBk base,ZeroR base,NaN,NaN,NaN,non definito
+Recall,IBk base,ZeroR base,0.546909,0.000000,7.61768989117306E-46,migliore
+AUC,IBk base,ZeroR base,0.765701,0.500000,3.1221161679526845E-46,migliore
+Kappa,IBk base,ZeroR base,0.498350,0.000000,3.929513328512036E-46,migliore
+Accuracy,RandomForest base,NaiveBayes base,0.943315,0.770486,1.1094653411925965E-46,migliore
+Precision,RandomForest base,NaiveBayes base,0.799678,0.198831,1.4116686673757213E-47,migliore
+Recall,RandomForest base,NaiveBayes base,0.490835,0.514242,0.4992078583024834,pari
+AUC,RandomForest base,NaiveBayes base,0.950994,0.754283,7.108681948419357E-35,migliore
+Kappa,RandomForest base,NaiveBayes base,0.577946,0.180628,1.452962411753716E-26,migliore
+Accuracy,RandomForest base,IBk base,0.943315,0.917715,5.965678684704117E-13,migliore
+Precision,RandomForest base,IBk base,0.799678,0.543325,1.1637308903019306E-23,migliore
+Recall,RandomForest base,IBk base,0.490835,0.546909,0.0057915086306418225,peggiore
+AUC,RandomForest base,IBk base,0.950994,0.765701,1.1380126923900448E-34,migliore
+Kappa,RandomForest base,IBk base,0.577946,0.498350,7.614165043960527E-5,migliore
+Accuracy,NaiveBayes base,IBk base,0.770486,0.917715,2.2251320634576344E-40,peggiore
+Precision,NaiveBayes base,IBk base,0.198831,0.543325,1.3997119054653879E-30,peggiore
+Recall,NaiveBayes base,IBk base,0.514242,0.546909,0.3292205931367925,pari
+AUC,NaiveBayes base,IBk base,0.754283,0.765701,0.43906261430140325,pari
+Kappa,NaiveBayes base,IBk base,0.180628,0.498350,1.39258052237019E-23,peggiore
+Accuracy,RandomForest FS,RandomForest base,0.946085,0.943315,0.2548155866255441,pari
+Precision,RandomForest FS,RandomForest base,0.827775,0.799678,0.13212753229108262,pari
+Recall,RandomForest FS,RandomForest base,0.503890,0.490835,0.5714727642652847,pari
+AUC,RandomForest FS,RandomForest base,0.949160,0.950994,0.5840278684265947,pari
+Kappa,RandomForest FS,RandomForest base,0.596700,0.577946,0.39556432272105935,pari
+Accuracy,RandomForest balancing,RandomForest base,0.781790,0.943315,6.820221798186813E-40,peggiore
+Precision,RandomForest balancing,RandomForest base,0.279347,0.799678,6.791030493970917E-45,peggiore
+Recall,RandomForest balancing,RandomForest base,0.900163,0.490835,2.0315890375398587E-30,migliore
+AUC,RandomForest balancing,RandomForest base,0.913667,0.950994,5.213939822133906E-13,peggiore
+Kappa,RandomForest balancing,RandomForest base,0.334999,0.577946,5.1830055641723745E-17,peggiore
+Accuracy,RandomForest FS + balancing,RandomForest base,0.778815,0.943315,5.2313130339728253E-42,peggiore
+Precision,RandomForest FS + balancing,RandomForest base,0.275743,0.799678,1.5752642573253438E-46,peggiore
+Recall,RandomForest FS + balancing,RandomForest base,0.895769,0.490835,3.120800411088307E-30,migliore
+AUC,RandomForest FS + balancing,RandomForest base,0.910160,0.950994,3.67049697363325E-12,peggiore
+Kappa,RandomForest FS + balancing,RandomForest base,0.329437,0.577946,2.6069119043912627E-18,peggiore
+Accuracy,NaiveBayes FS,NaiveBayes base,0.837175,0.770486,4.267646378348448E-23,migliore
+Precision,NaiveBayes FS,NaiveBayes base,0.262407,0.198831,8.935355561621483E-9,migliore
+Recall,NaiveBayes FS,NaiveBayes base,0.448643,0.514242,7.699017368059404E-4,peggiore
+AUC,NaiveBayes FS,NaiveBayes base,0.787230,0.754283,7.358371904880642E-9,migliore
+Kappa,NaiveBayes FS,NaiveBayes base,0.245112,0.180628,1.1656035385704043E-5,migliore
+Accuracy,NaiveBayes balancing,NaiveBayes base,0.751934,0.770486,2.466002924648331E-7,peggiore
+Precision,NaiveBayes balancing,NaiveBayes base,0.194130,0.198831,0.26875598577033466,pari
+Recall,NaiveBayes balancing,NaiveBayes base,0.559869,0.514242,1.8821786305903618E-4,migliore
+AUC,NaiveBayes balancing,NaiveBayes base,0.752852,0.754283,0.4102875783548051,pari
+Kappa,NaiveBayes balancing,NaiveBayes base,0.178782,0.180628,0.7890303654859848,pari
+Accuracy,NaiveBayes FS + balancing,NaiveBayes base,0.787073,0.770486,0.0022350597182528506,migliore
+Precision,NaiveBayes FS + balancing,NaiveBayes base,0.225083,0.198831,0.0012854381709234682,migliore
+Recall,NaiveBayes FS + balancing,NaiveBayes base,0.561433,0.514242,0.037279433009273014,migliore
+AUC,NaiveBayes FS + balancing,NaiveBayes base,0.786385,0.754283,7.233947874406686E-9,migliore
+Kappa,NaiveBayes FS + balancing,NaiveBayes base,0.221321,0.180628,0.002006759926282506,migliore
+Accuracy,IBk FS,IBk base,0.912671,0.917715,0.1676423000837427,pari
+Precision,IBk FS,IBk base,0.515599,0.543325,0.18492560840516703,pari
+Recall,IBk FS,IBk base,0.503955,0.546909,0.06230665303996884,pari
+AUC,IBk FS,IBk base,0.774099,0.765701,0.6719571840247991,pari
+Kappa,IBk FS,IBk base,0.459993,0.498350,0.07104072112278238,pari
+Accuracy,IBk balancing,IBk base,0.759218,0.917715,1.7623524121344142E-44,peggiore
+Precision,IBk balancing,IBk base,0.249469,0.543325,2.511181438218508E-28,peggiore
+Recall,IBk balancing,IBk base,0.835631,0.546909,1.4708878717043579E-22,migliore
+AUC,IBk balancing,IBk base,0.794511,0.765701,0.01307243843528296,migliore
+Kappa,IBk balancing,IBk base,0.285322,0.498350,8.752170543777194E-19,peggiore
+Accuracy,IBk FS + balancing,IBk base,0.749402,0.917715,4.8332571666272356E-42,peggiore
+Precision,IBk FS + balancing,IBk base,0.240628,0.543325,3.687066639047333E-29,peggiore
+Recall,IBk FS + balancing,IBk base,0.828186,0.546909,8.775555091426842E-18,migliore
+AUC,IBk FS + balancing,IBk base,0.790243,0.765701,0.06964269814046838,pari
+Kappa,IBk FS + balancing,IBk base,0.271401,0.498350,1.090383913365035E-18,peggiore
