@@ -19,7 +19,12 @@ import it.uniroma2.isw2.storm.metrics.ClassMetricsExtractor;
 import it.uniroma2.isw2.storm.metrics.CommitMetricsExtractor;
 import it.uniroma2.isw2.storm.metrics.FixCommitDetector;
 import it.uniroma2.isw2.storm.prediction.ArffFiles;
+import it.uniroma2.isw2.storm.prediction.CrossValidation;
+import it.uniroma2.isw2.storm.prediction.CrossValidationCsvWriter;
+import it.uniroma2.isw2.storm.prediction.CrossValidationTests;
+import it.uniroma2.isw2.storm.prediction.FoldResult;
 import it.uniroma2.isw2.storm.prediction.PredictionDataset;
+import it.uniroma2.isw2.storm.prediction.PredictionScheme;
 import it.uniroma2.isw2.storm.release.IncludedRelease;
 import it.uniroma2.isw2.storm.release.IncludedReleaseCsvReader;
 import it.uniroma2.isw2.storm.release.MainlineSelector;
@@ -71,12 +76,18 @@ public final class Main {
     private static final Path TEST_ARFF = Path.of("weka", PROJECT_KEY + "Test.arff");
     // Metrica usata nei log per controllare il logaritmo: LOC grezze da 5 a 2.430.
     private static final String SIZE_METRIC = "LOC_Release";
+    private static final Path CROSS_VALIDATION_CSV = Path.of("results", PROJECT_KEY + "CrossValidation.csv");
+    private static final Path CROSS_VALIDATION_TESTS_CSV = Path.of("results", PROJECT_KEY + "CrossValidationTests.csv");
+    // 10x10-fold cross-validation stratificata e test appaiato corretto al livello 0,05.
+    private static final int REPETITIONS = 10;
+    private static final int FOLDS = 10;
+    private static final double SIGNIFICANCE_LEVEL = 0.05;
 
     // Stessa query del programma fornito a lezione.
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff|crossvalidation>\"";
 
     private Main() {
     }
@@ -96,6 +107,7 @@ public final class Main {
             case "labeling" -> labelClasses();
             case "dataset" -> assembleDataset();
             case "arff" -> exportArff();
+            case "crossvalidation" -> crossValidate();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -210,5 +222,19 @@ public final class Main {
         Instances saved = ArffFiles.read(arffFile);
         String summary = ArffFiles.describe(saved) + "; " + ArffFiles.numericRange(saved, SIZE_METRIC);
         LOGGER.info(() -> arffFile + ": " + summary);
+    }
+
+    private static void crossValidate() throws IOException {
+        Instances dataset = ArffFiles.read(DATASET_ARFF);
+        List<PredictionScheme> schemes = PredictionScheme.all();
+        LOGGER.info(() -> REPETITIONS + "x" + FOLDS + "-fold cross-validation stratificata su " + dataset.numInstances()
+                + " istanze, " + schemes.size() + " schemi");
+        List<FoldResult> results = new CrossValidation(REPETITIONS, FOLDS).run(dataset, schemes);
+        CrossValidationCsvWriter.writeFolds(results, CROSS_VALIDATION_CSV);
+        List<CrossValidationTests.Comparison> comparisons = CrossValidationTests.compare(results, schemes,
+                SIGNIFICANCE_LEVEL);
+        CrossValidationCsvWriter.writeComparisons(comparisons, CROSS_VALIDATION_TESTS_CSV);
+        LOGGER.info(() -> results.size() + " valutazioni salvate in " + CROSS_VALIDATION_CSV + ", "
+                + comparisons.size() + " confronti in " + CROSS_VALIDATION_TESTS_CSV);
     }
 }
