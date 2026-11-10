@@ -8,29 +8,46 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** CSV dei risultati: una riga per schema, ripetizione e fold, e una riga per confronto statistico. */
-public final class CrossValidationCsvWriter {
+/**
+ * CSV dei risultati: per la cross-validation una riga per schema, ripetizione e fold e una riga per confronto
+ * statistico; per lo split cronologico una riga per schema.
+ */
+public final class ResultsCsvWriter {
 
-    private static final String FOLDS_HEADER = "Scheme,Run,Fold,Training,Test,Attributes,Accuracy,Precision,Recall,AUC,"
-            + "Kappa,TP,FP,TN,FN";
+    private static final String EVALUATION_COLUMNS = "Training,Test,Attributes,Accuracy,Precision,Recall,AUC,Kappa,"
+            + "TP,FP,TN,FN";
+    private static final String FOLDS_HEADER = "Scheme,Run,Fold," + EVALUATION_COLUMNS;
+    private static final String SPLIT_HEADER = "Scheme," + EVALUATION_COLUMNS;
     private static final String TESTS_HEADER = "Metric,Scheme,Reference,SchemeMean,ReferenceMean,PValue,Outcome";
 
-    private CrossValidationCsvWriter() {
+    private ResultsCsvWriter() {
     }
 
     public static void writeFolds(List<FoldResult> results, Path csvFile) throws IOException {
-        if (results.isEmpty()) {
-            throw new IllegalArgumentException("Nessun risultato da scrivere in " + csvFile);
-        }
-        write(FOLDS_HEADER, results.stream().map(CrossValidationCsvWriter::toCsvLine).toList(), csvFile);
+        requireRows(results, csvFile);
+        write(FOLDS_HEADER, results.stream()
+                .map(result -> String.join(",", result.evaluation().scheme().name(), String.valueOf(result.run()),
+                        String.valueOf(result.fold()), evaluationFields(result.evaluation())))
+                .toList(), csvFile);
+    }
+
+    public static void writeSplit(List<SchemeEvaluation> evaluations, Path csvFile) throws IOException {
+        requireRows(evaluations, csvFile);
+        write(SPLIT_HEADER, evaluations.stream()
+                .map(evaluation -> String.join(",", evaluation.scheme().name(), evaluationFields(evaluation)))
+                .toList(), csvFile);
     }
 
     public static void writeComparisons(List<CrossValidationTests.Comparison> comparisons, Path csvFile)
             throws IOException {
-        if (comparisons.isEmpty()) {
-            throw new IllegalArgumentException("Nessun confronto da scrivere in " + csvFile);
+        requireRows(comparisons, csvFile);
+        write(TESTS_HEADER, comparisons.stream().map(ResultsCsvWriter::toCsvLine).toList(), csvFile);
+    }
+
+    private static void requireRows(List<?> rows, Path csvFile) {
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("Nessun risultato da scrivere in " + csvFile);
         }
-        write(TESTS_HEADER, comparisons.stream().map(CrossValidationCsvWriter::toCsvLine).toList(), csvFile);
     }
 
     private static void write(String header, List<String> rows, Path csvFile) throws IOException {
@@ -41,12 +58,10 @@ public final class CrossValidationCsvWriter {
         Files.writeString(csvFile, String.join("\n", lines) + "\n", StandardCharsets.UTF_8);
     }
 
-    private static String toCsvLine(FoldResult result) {
-        SchemeEvaluation evaluation = result.evaluation();
+    private static String evaluationFields(SchemeEvaluation evaluation) {
         PredictionMetrics metrics = evaluation.metrics();
         PredictionMetrics.Confusion confusion = metrics.confusion();
-        return String.join(",", evaluation.scheme().name(), String.valueOf(result.run()), String.valueOf(result.fold()),
-                String.valueOf(evaluation.trainingSize()), String.valueOf(evaluation.testSize()),
+        return String.join(",", String.valueOf(evaluation.trainingSize()), String.valueOf(evaluation.testSize()),
                 String.valueOf(evaluation.attributes()), decimal(metrics.accuracy()), decimal(metrics.precision()),
                 decimal(metrics.recall()), decimal(metrics.auc()), decimal(metrics.kappa()),
                 String.valueOf(confusion.truePositives()), String.valueOf(confusion.falsePositives()),

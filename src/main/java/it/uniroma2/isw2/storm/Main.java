@@ -19,12 +19,14 @@ import it.uniroma2.isw2.storm.metrics.ClassMetricsExtractor;
 import it.uniroma2.isw2.storm.metrics.CommitMetricsExtractor;
 import it.uniroma2.isw2.storm.metrics.FixCommitDetector;
 import it.uniroma2.isw2.storm.prediction.ArffFiles;
+import it.uniroma2.isw2.storm.prediction.ChronologicalSplit;
 import it.uniroma2.isw2.storm.prediction.CrossValidation;
-import it.uniroma2.isw2.storm.prediction.CrossValidationCsvWriter;
 import it.uniroma2.isw2.storm.prediction.CrossValidationTests;
 import it.uniroma2.isw2.storm.prediction.FoldResult;
 import it.uniroma2.isw2.storm.prediction.PredictionDataset;
 import it.uniroma2.isw2.storm.prediction.PredictionScheme;
+import it.uniroma2.isw2.storm.prediction.ResultsCsvWriter;
+import it.uniroma2.isw2.storm.prediction.SchemeEvaluation;
 import it.uniroma2.isw2.storm.release.IncludedRelease;
 import it.uniroma2.isw2.storm.release.IncludedReleaseCsvReader;
 import it.uniroma2.isw2.storm.release.MainlineSelector;
@@ -76,8 +78,11 @@ public final class Main {
     private static final Path TEST_ARFF = Path.of("weka", PROJECT_KEY + "Test.arff");
     // Metrica usata nei log per controllare il logaritmo: LOC grezze da 5 a 2.430.
     private static final String SIZE_METRIC = "LOC_Release";
-    private static final Path CROSS_VALIDATION_CSV = Path.of("results", PROJECT_KEY + "CrossValidation.csv");
-    private static final Path CROSS_VALIDATION_TESTS_CSV = Path.of("results", PROJECT_KEY + "CrossValidationTests.csv");
+    private static final String RESULTS_DIRECTORY = "results";
+    private static final Path CROSS_VALIDATION_CSV = Path.of(RESULTS_DIRECTORY, PROJECT_KEY + "CrossValidation.csv");
+    private static final Path CROSS_VALIDATION_TESTS_CSV = Path.of(RESULTS_DIRECTORY,
+            PROJECT_KEY + "CrossValidationTests.csv");
+    private static final Path SPLIT_CSV = Path.of(RESULTS_DIRECTORY, PROJECT_KEY + "Split.csv");
     // 10x10-fold cross-validation stratificata e test appaiato corretto al livello 0,05.
     private static final int REPETITIONS = 10;
     private static final int FOLDS = 10;
@@ -87,7 +92,7 @@ public final class Main {
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff|crossvalidation>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff|crossvalidation|split>\"";
 
     private Main() {
     }
@@ -108,6 +113,7 @@ public final class Main {
             case "dataset" -> assembleDataset();
             case "arff" -> exportArff();
             case "crossvalidation" -> crossValidate();
+            case "split" -> evaluateSplit();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -230,11 +236,22 @@ public final class Main {
         LOGGER.info(() -> REPETITIONS + "x" + FOLDS + "-fold cross-validation stratificata su " + dataset.numInstances()
                 + " istanze, " + schemes.size() + " schemi");
         List<FoldResult> results = new CrossValidation(REPETITIONS, FOLDS).run(dataset, schemes);
-        CrossValidationCsvWriter.writeFolds(results, CROSS_VALIDATION_CSV);
+        ResultsCsvWriter.writeFolds(results, CROSS_VALIDATION_CSV);
         List<CrossValidationTests.Comparison> comparisons = CrossValidationTests.compare(results, schemes,
                 SIGNIFICANCE_LEVEL);
-        CrossValidationCsvWriter.writeComparisons(comparisons, CROSS_VALIDATION_TESTS_CSV);
+        ResultsCsvWriter.writeComparisons(comparisons, CROSS_VALIDATION_TESTS_CSV);
         LOGGER.info(() -> results.size() + " valutazioni salvate in " + CROSS_VALIDATION_CSV + ", "
                 + comparisons.size() + " confronti in " + CROSS_VALIDATION_TESTS_CSV);
+    }
+
+    private static void evaluateSplit() throws IOException {
+        Instances training = ArffFiles.read(TRAIN_ARFF);
+        Instances test = ArffFiles.read(TEST_ARFF);
+        List<PredictionScheme> schemes = PredictionScheme.all();
+        LOGGER.info(() -> "Split cronologico: training su " + training.numInstances() + " istanze, test su "
+                + test.numInstances() + " istanze, " + schemes.size() + " schemi");
+        List<SchemeEvaluation> evaluations = ChronologicalSplit.run(training, test, schemes);
+        ResultsCsvWriter.writeSplit(evaluations, SPLIT_CSV);
+        LOGGER.info(() -> evaluations.size() + " valutazioni salvate in " + SPLIT_CSV);
     }
 }

@@ -59,12 +59,8 @@ public final class CrossValidation {
             double attributes = evaluations.stream().mapToInt(SchemeEvaluation::attributes).average().orElse(Double.NaN);
             LOGGER.info(() -> String.format("%s: Accuracy %.3f, Precision %s, Recall %.3f, AUC %.3f, Kappa %.3f, "
                             + "attributi usati %.1f (medie su %d fold)", scheme.name(), Metric.ACCURACY.mean(metrics),
-                    formatDefined(Metric.PRECISION.mean(metrics)), Metric.RECALL.mean(metrics), Metric.AUC.mean(metrics),
+                    Metric.display(Metric.PRECISION.mean(metrics)), Metric.RECALL.mean(metrics), Metric.AUC.mean(metrics),
                     Metric.KAPPA.mean(metrics), attributes, metrics.size()));
         }
-    }
-
-    private static String formatDefined(double value) {
-        return Double.isNaN(value) ? "non definita" : String.format("%.3f", value);
     }
 }
