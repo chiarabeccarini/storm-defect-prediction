@@ -5,6 +5,7 @@ import it.uniroma2.isw2.storm.classes.ReleaseClass;
 import it.uniroma2.isw2.storm.classes.ReleaseClassCsvReader;
 import it.uniroma2.isw2.storm.classes.ReleaseClassCsvWriter;
 import it.uniroma2.isw2.storm.dataset.DatasetAssembler;
+import it.uniroma2.isw2.storm.figures.ResultCharts;
 import it.uniroma2.isw2.storm.git.GitRepository;
 import it.uniroma2.isw2.storm.jira.JiraClient;
 import it.uniroma2.isw2.storm.jira.ReleaseExtractor;
@@ -20,11 +21,14 @@ import it.uniroma2.isw2.storm.metrics.CommitMetricsExtractor;
 import it.uniroma2.isw2.storm.metrics.FixCommitDetector;
 import it.uniroma2.isw2.storm.prediction.ArffFiles;
 import it.uniroma2.isw2.storm.prediction.ChronologicalSplit;
+import it.uniroma2.isw2.storm.prediction.Configuration;
 import it.uniroma2.isw2.storm.prediction.CrossValidation;
 import it.uniroma2.isw2.storm.prediction.CrossValidationTests;
 import it.uniroma2.isw2.storm.prediction.FoldResult;
+import it.uniroma2.isw2.storm.prediction.Metric;
 import it.uniroma2.isw2.storm.prediction.PredictionDataset;
 import it.uniroma2.isw2.storm.prediction.PredictionScheme;
+import it.uniroma2.isw2.storm.prediction.ResultsCsvReader;
 import it.uniroma2.isw2.storm.prediction.ResultsCsvWriter;
 import it.uniroma2.isw2.storm.prediction.SchemeEvaluation;
 import it.uniroma2.isw2.storm.release.IncludedRelease;
@@ -50,6 +54,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -83,6 +88,10 @@ public final class Main {
     private static final Path CROSS_VALIDATION_TESTS_CSV = Path.of(RESULTS_DIRECTORY,
             PROJECT_KEY + "CrossValidationTests.csv");
     private static final Path SPLIT_CSV = Path.of(RESULTS_DIRECTORY, PROJECT_KEY + "Split.csv");
+    private static final Path FIGURES_DIRECTORY = Path.of("figures");
+    // Il grafico delle configurazioni riguarda il classificatore scelto per la Milestone 3.
+    private static final String CONFIGURATIONS_CLASSIFIER = "RandomForest";
+    private static final List<Metric> CONFIGURATION_METRICS = List.of(Metric.PRECISION, Metric.RECALL, Metric.KAPPA);
     // 10x10-fold cross-validation stratificata e test appaiato corretto al livello 0,05.
     private static final int REPETITIONS = 10;
     private static final int FOLDS = 10;
@@ -92,7 +101,7 @@ public final class Main {
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff|crossvalidation|split>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff|crossvalidation|split|figures>\"";
 
     private Main() {
     }
@@ -114,6 +123,7 @@ public final class Main {
             case "arff" -> exportArff();
             case "crossvalidation" -> crossValidate();
             case "split" -> evaluateSplit();
+            case "figures" -> drawFigures();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -253,5 +263,24 @@ public final class Main {
         List<SchemeEvaluation> evaluations = ChronologicalSplit.run(training, test, schemes);
         ResultsCsvWriter.writeSplit(evaluations, SPLIT_CSV);
         LOGGER.info(() -> evaluations.size() + " valutazioni salvate in " + SPLIT_CSV);
+    }
+
+    // Le figure si ricavano dal CSV dei fold già salvato, senza rilanciare la cross-validation.
+    private static void drawFigures() throws IOException {
+        Map<String, Map<Metric, List<Double>>> folds = ResultsCsvReader.readFolds(CROSS_VALIDATION_CSV);
+        List<PredictionScheme> schemes = PredictionScheme.all();
+        List<PredictionScheme> classifiers = schemes.stream()
+                .filter(scheme -> scheme.configuration() == Configuration.BASE)
+                .filter(scheme -> !scheme.classifier().equals(PredictionScheme.BASELINE))
+                .toList();
+        for (Metric metric : Metric.values()) {
+            ResultCharts.boxplot(folds, classifiers, metric,
+                    FIGURES_DIRECTORY.resolve(PROJECT_KEY + "Boxplot" + metric.label() + ".png"));
+        }
+        List<PredictionScheme> configurations = schemes.stream()
+                .filter(scheme -> scheme.classifier().equals(CONFIGURATIONS_CLASSIFIER))
+                .toList();
+        ResultCharts.configurationBars(folds, configurations, CONFIGURATION_METRICS,
+                FIGURES_DIRECTORY.resolve(PROJECT_KEY + CONFIGURATIONS_CLASSIFIER + "Configurations.png"));
     }
 }
