@@ -27,6 +27,11 @@ public enum Metric {
         return value.applyAsDouble(metrics);
     }
 
+    /** Per i log: tre decimali, oppure "non definita" per un valore NaN come la Precision di ZeroR. */
+    public static String display(double value) {
+        return Double.isNaN(value) ? "non definita" : String.format("%.3f", value);
+    }
+
     // I valori non definiti (NaN) si escludono, come fa l'Experimenter con i valori mancanti.
     public double mean(Collection<PredictionMetrics> evaluations) {
         return evaluations.stream().mapToDouble(this::of).filter(metric -> !Double.isNaN(metric)).average()
