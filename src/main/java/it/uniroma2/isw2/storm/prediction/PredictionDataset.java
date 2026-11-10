@@ -20,11 +20,13 @@ import java.util.function.IntPredicate;
  */
 public final class PredictionDataset {
 
+    public static final String POSITIVE_CLASS = "Yes";
+
     private static final String RELEASE_ID_COLUMN = "Release ID";
     private static final List<String> IDENTIFIER_COLUMNS = List.of("Project Name", "Class Name", RELEASE_ID_COLUMN);
     private static final String CLASS_COLUMN = "Bugginess";
     // Yes per primo: Weka calcola Precision e Recall sul primo valore della classe.
-    private static final List<String> CLASS_VALUES = List.of("Yes", "No");
+    private static final List<String> CLASS_VALUES = List.of(POSITIVE_CLASS, "No");
 
     private final List<String> metricNames;
     private final List<LabeledRow> rows;
