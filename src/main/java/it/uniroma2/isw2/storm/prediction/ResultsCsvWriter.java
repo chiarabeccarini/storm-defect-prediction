@@ -10,7 +10,7 @@ import java.util.Locale;
 
 /**
  * CSV dei risultati: per la cross-validation una riga per schema, ripetizione e fold e una riga per confronto
- * statistico; per lo split cronologico una riga per schema.
+ * statistico; per lo split cronologico una riga per schema; per l'analisi What-If una riga per dataset.
  */
 public final class ResultsCsvWriter {
 
@@ -19,6 +19,7 @@ public final class ResultsCsvWriter {
     private static final String FOLDS_HEADER = "Scheme,Run,Fold," + EVALUATION_COLUMNS;
     private static final String SPLIT_HEADER = "Scheme," + EVALUATION_COLUMNS;
     private static final String TESTS_HEADER = "Metric,Scheme,Reference,SchemeMean,ReferenceMean,PValue,Outcome";
+    private static final String WHAT_IF_HEADER = "Dataset,Instances,ActualYes,PredictedYes";
 
     private ResultsCsvWriter() {
     }
@@ -42,6 +43,18 @@ public final class ResultsCsvWriter {
             throws IOException {
         requireRows(comparisons, csvFile);
         write(TESTS_HEADER, comparisons.stream().map(ResultsCsvWriter::toCsvLine).toList(), csvFile);
+    }
+
+    // B non ha classi reali: la sua colonna ActualYes resta vuota.
+    public static void writeWhatIf(WhatIfAnalysis.Result result, Path csvFile) throws IOException {
+        if (result == null) {
+            throw new IllegalArgumentException("Nessun risultato What-If da scrivere in " + csvFile);
+        }
+        write(WHAT_IF_HEADER, result.counts().stream()
+                .map(count -> String.join(",", count.dataset(), String.valueOf(count.instances()),
+                        count.actualYes().isPresent() ? String.valueOf(count.actualYes().getAsInt()) : "",
+                        String.valueOf(count.predictedYes())))
+                .toList(), csvFile);
     }
 
     private static void requireRows(List<?> rows, Path csvFile) {

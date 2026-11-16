@@ -38,4 +38,16 @@ public record PredictionScheme(String classifier, Configuration configuration, C
         }
         return List.copyOf(schemes);
     }
+
+    /** Lo schema di un classificatore in una configurazione, preso tra quelli confrontati nella Milestone 2. */
+    public static PredictionScheme find(String classifier, Configuration configuration) {
+        if (classifier == null || configuration == null) {
+            throw new IllegalArgumentException("Classificatore e configurazione sono obbligatori");
+        }
+        return all().stream()
+                .filter(scheme -> scheme.classifier().equals(classifier) && scheme.configuration() == configuration)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Schema inesistente: " + classifier + " "
+                        + configuration.label()));
+    }
 }

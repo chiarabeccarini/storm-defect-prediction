@@ -31,6 +31,8 @@ import it.uniroma2.isw2.storm.prediction.PredictionScheme;
 import it.uniroma2.isw2.storm.prediction.ResultsCsvReader;
 import it.uniroma2.isw2.storm.prediction.ResultsCsvWriter;
 import it.uniroma2.isw2.storm.prediction.SchemeEvaluation;
+import it.uniroma2.isw2.storm.prediction.WhatIfAnalysis;
+import it.uniroma2.isw2.storm.prediction.WhatIfDatasets;
 import it.uniroma2.isw2.storm.release.IncludedRelease;
 import it.uniroma2.isw2.storm.release.IncludedReleaseCsvReader;
 import it.uniroma2.isw2.storm.release.MainlineSelector;
@@ -78,19 +80,28 @@ public final class Main {
     private static final Path SMELLS_CSV = Path.of("data", PROJECT_KEY + "Smells.csv");
     private static final Path BUGGINESS_CSV = Path.of("data", PROJECT_KEY + "Bugginess.csv");
     private static final Path DATASET_CSV = Path.of("data", PROJECT_KEY + "Dataset.csv");
-    private static final Path DATASET_ARFF = Path.of("weka", PROJECT_KEY + "Dataset.arff");
-    private static final Path TRAIN_ARFF = Path.of("weka", PROJECT_KEY + "Train.arff");
-    private static final Path TEST_ARFF = Path.of("weka", PROJECT_KEY + "Test.arff");
+    private static final String WEKA_DIRECTORY = "weka";
+    private static final Path DATASET_ARFF = Path.of(WEKA_DIRECTORY, PROJECT_KEY + "Dataset.arff");
+    private static final Path TRAIN_ARFF = Path.of(WEKA_DIRECTORY, PROJECT_KEY + "Train.arff");
+    private static final Path TEST_ARFF = Path.of(WEKA_DIRECTORY, PROJECT_KEY + "Test.arff");
+    // Dataset dell'analisi What-If: B+ con almeno uno smell, B uguale a B+ con gli smell a 0, C senza smell.
+    private static final Path WITH_SMELLS_ARFF = Path.of(WEKA_DIRECTORY, PROJECT_KEY + "Bplus.arff");
+    private static final Path SMELLS_REMOVED_ARFF = Path.of(WEKA_DIRECTORY, PROJECT_KEY + "B.arff");
+    private static final Path WITHOUT_SMELLS_ARFF = Path.of(WEKA_DIRECTORY, PROJECT_KEY + "C.arff");
     // Metrica usata nei log per controllare il logaritmo: LOC grezze da 5 a 2.430.
     private static final String SIZE_METRIC = "LOC_Release";
+    private static final String SMELLS_METRIC = "NSmells";
     private static final String RESULTS_DIRECTORY = "results";
     private static final Path CROSS_VALIDATION_CSV = Path.of(RESULTS_DIRECTORY, PROJECT_KEY + "CrossValidation.csv");
     private static final Path CROSS_VALIDATION_TESTS_CSV = Path.of(RESULTS_DIRECTORY,
             PROJECT_KEY + "CrossValidationTests.csv");
     private static final Path SPLIT_CSV = Path.of(RESULTS_DIRECTORY, PROJECT_KEY + "Split.csv");
+    private static final Path WHAT_IF_CSV = Path.of(RESULTS_DIRECTORY, PROJECT_KEY + "WhatIf.csv");
     private static final Path FIGURES_DIRECTORY = Path.of("figures");
+    // BClassifier della Milestone 3, scelto con la regola fissata prima degli esperimenti: Random Forest senza filtri.
+    private static final String B_CLASSIFIER = "RandomForest";
     // Il grafico delle configurazioni riguarda il classificatore scelto per la Milestone 3.
-    private static final String CONFIGURATIONS_CLASSIFIER = "RandomForest";
+    private static final String CONFIGURATIONS_CLASSIFIER = B_CLASSIFIER;
     private static final List<Metric> CONFIGURATION_METRICS = List.of(Metric.PRECISION, Metric.RECALL, Metric.KAPPA);
     // 10x10-fold cross-validation stratificata e test appaiato corretto al livello 0,05.
     private static final int REPETITIONS = 10;
@@ -101,7 +112,7 @@ public final class Main {
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff|crossvalidation|split|figures>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff|crossvalidation|split|figures|whatif>\"";
 
     private Main() {
     }
@@ -124,6 +135,7 @@ public final class Main {
             case "crossvalidation" -> crossValidate();
             case "split" -> evaluateSplit();
             case "figures" -> drawFigures();
+            case "whatif" -> analyzeWhatIf();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -233,11 +245,12 @@ public final class Main {
     }
 
     // Il riepilogo viene dal file riletto con Weka, cioè da ciò che leggeranno i passi successivi.
-    private static void saveArff(Instances instances, Path arffFile) throws IOException {
+    private static Instances saveArff(Instances instances, Path arffFile) throws IOException {
         ArffFiles.write(instances, arffFile);
         Instances saved = ArffFiles.read(arffFile);
         String summary = ArffFiles.describe(saved) + "; " + ArffFiles.numericRange(saved, SIZE_METRIC);
         LOGGER.info(() -> arffFile + ": " + summary);
+        return saved;
     }
 
     private static void crossValidate() throws IOException {
@@ -282,5 +295,19 @@ public final class Main {
                 .toList();
         ResultCharts.configurationBars(folds, configurations, CONFIGURATION_METRICS,
                 FIGURES_DIRECTORY.resolve(PROJECT_KEY + CONFIGURATIONS_CLASSIFIER + "Configurations.png"));
+    }
+
+    // B+, B e C si ricavano da A e si predicono riletti dai file salvati: i file sono proprio ciò che il modello predice.
+    private static void analyzeWhatIf() throws IOException {
+        Instances dataset = ArffFiles.read(DATASET_ARFF);
+        PredictionScheme bClassifier = PredictionScheme.find(B_CLASSIFIER, Configuration.BASE);
+        LOGGER.info(() -> "What-If: " + bClassifier.name() + " addestrato su A (" + dataset.numInstances()
+                + " istanze), predizione di A, B+, B e C");
+        var derived = WhatIfDatasets.derive(dataset, SMELLS_METRIC, PROJECT_KEY);
+        WhatIfAnalysis.Result result = WhatIfAnalysis.analyze(bClassifier, dataset,
+                saveArff(derived.withSmells(), WITH_SMELLS_ARFF), saveArff(derived.smellsRemoved(), SMELLS_REMOVED_ARFF),
+                saveArff(derived.withoutSmells(), WITHOUT_SMELLS_ARFF), SMELLS_METRIC);
+        ResultsCsvWriter.writeWhatIf(result, WHAT_IF_CSV);
+        LOGGER.info(() -> result.counts().size() + " righe salvate in " + WHAT_IF_CSV);
     }
 }

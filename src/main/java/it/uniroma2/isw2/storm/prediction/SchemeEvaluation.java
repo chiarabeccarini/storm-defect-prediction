@@ -29,7 +29,7 @@ public record SchemeEvaluation(PredictionScheme scheme, int trainingSize, int te
         }
     }
 
-    private static int positiveClass(Instances training) {
+    static int positiveClass(Instances training) {
         int positive = training.classAttribute().indexOfValue(PredictionDataset.POSITIVE_CLASS);
         if (positive < 0) {
             throw new IllegalArgumentException("Classe " + PredictionDataset.POSITIVE_CLASS + " assente in "
