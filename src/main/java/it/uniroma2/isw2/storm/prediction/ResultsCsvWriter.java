@@ -10,7 +10,8 @@ import java.util.Locale;
 
 /**
  * CSV dei risultati: per la cross-validation una riga per schema, ripetizione e fold e una riga per confronto
- * statistico; per lo split cronologico una riga per schema; per l'analisi What-If una riga per dataset.
+ * statistico; per lo split cronologico una riga per schema; per l'analisi What-If una riga per dataset; per le
+ * correlazioni con Bugginess una riga per metrica.
  */
 public final class ResultsCsvWriter {
 
@@ -20,6 +21,7 @@ public final class ResultsCsvWriter {
     private static final String SPLIT_HEADER = "Scheme," + EVALUATION_COLUMNS;
     private static final String TESTS_HEADER = "Metric,Scheme,Reference,SchemeMean,ReferenceMean,PValue,Outcome";
     private static final String WHAT_IF_HEADER = "Dataset,Instances,ActualYes,PredictedYes";
+    private static final String CORRELATIONS_HEADER = "Metric,Pearson";
 
     private ResultsCsvWriter() {
     }
@@ -54,6 +56,14 @@ public final class ResultsCsvWriter {
                 .map(count -> String.join(",", count.dataset(), String.valueOf(count.instances()),
                         count.actualYes().isPresent() ? String.valueOf(count.actualYes().getAsInt()) : "",
                         String.valueOf(count.predictedYes())))
+                .toList(), csvFile);
+    }
+
+    public static void writeCorrelations(List<MetricCorrelations.Correlation> correlations, Path csvFile)
+            throws IOException {
+        requireRows(correlations, csvFile);
+        write(CORRELATIONS_HEADER, correlations.stream()
+                .map(correlation -> String.join(",", correlation.metric(), decimal(correlation.pearson())))
                 .toList(), csvFile);
     }
 

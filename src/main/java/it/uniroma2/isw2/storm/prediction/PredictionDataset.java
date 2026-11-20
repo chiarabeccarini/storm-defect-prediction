@@ -15,8 +15,8 @@ import java.util.function.IntPredicate;
 
 /**
  * Dataset della Milestone 1 pronto per Weka. Le colonne identificative non diventano attributi: il Release ID serve
- * solo a scegliere le righe di training e di test. Le metriche sono trasformate con log10(x + 1), che porta 0 in 0,
- * e la classe Bugginess è l'ultimo attributo.
+ * solo a scegliere le righe di training e di test. Le metriche si leggono grezze e diventano attributi trasformati
+ * con log10(x + 1), che porta 0 in 0; la classe Bugginess è l'ultimo attributo.
  */
 public final class PredictionDataset {
 
@@ -56,6 +56,23 @@ public final class PredictionDataset {
         return rows.stream().mapToInt(LabeledRow::releaseId).max().orElseThrow();
     }
 
+    List<String> metricNames() {
+        return metricNames;
+    }
+
+    /** Valori grezzi di una metrica, nell'ordine delle righe del CSV. */
+    double[] rawValues(int metric) {
+        if (metric < 0 || metric >= metricNames.size()) {
+            throw new IllegalArgumentException("Metrica inesistente: " + metric);
+        }
+        return rows.stream().mapToDouble(row -> row.metrics().get(metric)).toArray();
+    }
+
+    /** Bugginess come numero, 1 per Yes e 0 per No, nell'ordine delle righe del CSV. */
+    double[] positiveClassIndicator() {
+        return rows.stream().mapToDouble(row -> row.bugginess().equals(POSITIVE_CLASS) ? 1 : 0).toArray();
+    }
+
     /** Righe delle release accettate dal filtro, con le sole metriche e la classe. */
     public Instances instances(String relationName, IntPredicate selectedRelease) {
         Instances instances = new Instances(relationName, new ArrayList<>(attributes()), rows.size());
@@ -75,7 +92,7 @@ public final class PredictionDataset {
     private static DenseInstance toInstance(LabeledRow row, Instances dataset) {
         double[] values = new double[dataset.numAttributes()];
         for (int metric = 0; metric < row.metrics().size(); metric++) {
-            values[metric] = row.metrics().get(metric);
+            values[metric] = Math.log10(row.metrics().get(metric) + 1);
         }
         values[dataset.classIndex()] = dataset.classAttribute().indexOfValue(row.bugginess());
         return new DenseInstance(1.0, values);
@@ -101,7 +118,7 @@ public final class PredictionDataset {
         try {
             int releaseId = Integer.parseInt(fields[IDENTIFIER_COLUMNS.indexOf(RELEASE_ID_COLUMN)]);
             List<Double> metrics = Arrays.stream(fields, IDENTIFIER_COLUMNS.size(), columns - 1)
-                    .map(PredictionDataset::logTransform)
+                    .map(PredictionDataset::nonNegativeMetric)
                     .toList();
             return new LabeledRow(releaseId, metrics, bugginess);
         } catch (NumberFormatException e) {
@@ -109,12 +126,12 @@ public final class PredictionDataset {
         }
     }
 
-    private static double logTransform(String value) {
+    private static double nonNegativeMetric(String value) {
         double metric = Double.parseDouble(value);
         if (metric < 0) {
             throw new IllegalArgumentException("Metrica negativa, il logaritmo non è definito: " + value);
         }
-        return Math.log10(metric + 1);
+        return metric;
     }
 
     private record LabeledRow(int releaseId, List<Double> metrics, String bugginess) {

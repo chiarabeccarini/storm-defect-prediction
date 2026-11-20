@@ -26,6 +26,7 @@ import it.uniroma2.isw2.storm.prediction.CrossValidation;
 import it.uniroma2.isw2.storm.prediction.CrossValidationTests;
 import it.uniroma2.isw2.storm.prediction.FoldResult;
 import it.uniroma2.isw2.storm.prediction.Metric;
+import it.uniroma2.isw2.storm.prediction.MetricCorrelations;
 import it.uniroma2.isw2.storm.prediction.PredictionDataset;
 import it.uniroma2.isw2.storm.prediction.PredictionScheme;
 import it.uniroma2.isw2.storm.prediction.ResultsCsvReader;
@@ -97,6 +98,7 @@ public final class Main {
             PROJECT_KEY + "CrossValidationTests.csv");
     private static final Path SPLIT_CSV = Path.of(RESULTS_DIRECTORY, PROJECT_KEY + "Split.csv");
     private static final Path WHAT_IF_CSV = Path.of(RESULTS_DIRECTORY, PROJECT_KEY + "WhatIf.csv");
+    private static final Path CORRELATIONS_CSV = Path.of(RESULTS_DIRECTORY, PROJECT_KEY + "Correlations.csv");
     private static final Path FIGURES_DIRECTORY = Path.of("figures");
     // BClassifier della Milestone 3, scelto con la regola fissata prima degli esperimenti: Random Forest senza filtri.
     private static final String B_CLASSIFIER = "RandomForest";
@@ -112,7 +114,7 @@ public final class Main {
     private static final String BUG_TICKETS_JQL = "project = " + PROJECT_KEY
             + " AND issuetype = Bug AND (status = Closed OR status = Resolved) AND resolution = Fixed";
 
-    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff|crossvalidation|split|figures|whatif>\"";
+    private static final String USAGE = "Uso: mvn -q compile exec:java \"-Dexec.args=<releases|selection|classes|tickets|metrics|commits|smells|labeling|dataset|arff|crossvalidation|split|figures|whatif|correlations>\"";
 
     private Main() {
     }
@@ -136,6 +138,7 @@ public final class Main {
             case "split" -> evaluateSplit();
             case "figures" -> drawFigures();
             case "whatif" -> analyzeWhatIf();
+            case "correlations" -> correlateMetrics();
             default -> throw new IllegalArgumentException("Passo sconosciuto: " + args[0] + ". " + USAGE);
         }
     }
@@ -309,5 +312,15 @@ public final class Main {
                 saveArff(derived.withoutSmells(), WITHOUT_SMELLS_ARFF), SMELLS_METRIC);
         ResultsCsvWriter.writeWhatIf(result, WHAT_IF_CSV);
         LOGGER.info(() -> result.counts().size() + " righe salvate in " + WHAT_IF_CSV);
+    }
+
+    // Valori grezzi, non i logaritmi dell'ARFF: nella Milestone 4 si confrontano le metriche misurate sulle classi.
+    private static void correlateMetrics() throws IOException {
+        PredictionDataset dataset = PredictionDataset.read(DATASET_CSV);
+        LOGGER.info(() -> "Correlazione di Pearson con Bugginess (Yes = 1, No = 0) di " + dataset.metricCount()
+                + " metriche grezze");
+        List<MetricCorrelations.Correlation> correlations = MetricCorrelations.withBugginess(dataset);
+        ResultsCsvWriter.writeCorrelations(correlations, CORRELATIONS_CSV);
+        LOGGER.info(() -> correlations.size() + " correlazioni salvate in " + CORRELATIONS_CSV);
     }
 }
